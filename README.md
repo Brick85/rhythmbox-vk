@@ -4,15 +4,16 @@ rhythmbox-vk
 rhythmbox-3 plugin for vk.com
 
 by Radist Morse
+edited by Vital Belikov
 
 NOTES:
 --------------
-Working with rhythmbox-3.0
+Working with rhythmbox-2.99.1
 
 INSTALLATION:
 --------------
 - cd ~/.local/share/rhythmbox/plugins  
-- git clone https://github.com/radistmorse/rhythmbox-vk.git vk  
+- git clone https://github.com/Brick85/rhythmbox-vk.git vk  
 - Switch the plugin on.  
 - Press "configure" and login to your VK account. Allow the plugin to access the musick.  
 - Close the config window manually.

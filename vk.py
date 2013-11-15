@@ -17,11 +17,14 @@
 from gi.repository import RB, Gio, Gtk, GdkPixbuf, GObject, Peas, PeasGtk, WebKit
 import rb #"Loader" heler class
 from xml.dom import minidom #xml parser
-import urllib.request, urllib.error, urllib.parse #search line escaping, simple https requests
+#import urllib.request, urllib.error, urllib.parse #search line escaping, simple https requests
+import urllib
 #from html_decode import decode_htmlentities #results decoding
 
 import gettext
 gettext.install('rhythmbox', RB.locale_dir())
+
+import sys
 
 #entry type for results. not saving on disk
 class VKEntryType(RB.RhythmDBEntryType):
@@ -38,7 +41,7 @@ class VKRhythmbox(GObject.Object, Peas.Activatable):
 
 	def __init__(self):
 		GObject.Object.__init__(self)
-			
+
 	def do_activate(self):
 		print("activating vk plugin")
 		#connecting to GSettings
@@ -57,8 +60,8 @@ class VKRhythmbox(GObject.Object, Peas.Activatable):
 		self.source = GObject.new (VKSource, shell=shell,
 						name="VK "+_("Music"),
 						entry_type=vk_entry_type,
-						plugin=self,
-						icon=Gio.FileIcon.new(iconfile))
+						plugin=self,)
+						#icon=Gio.FileIcon.new(iconfile))
 		self.source.setup(db, self.settings)
 		shell.register_entry_type_for_source(self.source, vk_entry_type)
 		#append source to the library
@@ -145,7 +148,7 @@ class VKSource(RB.BrowserSource):
 		self.configured = False
 		if (len(self.TOKEN) == 0) :
 			return
-		xml = minidom.parseString(urllib.request.urlopen("https://api.vk.com/method/users.isAppUser.xml?access_token=%s%s" % (self.TOKEN, self.CAPTCHA_PARAM)).read())
+		xml = minidom.parseString(urllib.urlopen("https://api.vk.com/method/users.isAppUser.xml?access_token=%s%s" % (self.TOKEN, self.CAPTCHA_PARAM)).read())
 		self.CAPTCHA_PARAM = ""
 		response = xml.getElementsByTagName("response")
 		if not response or len(response) == 0 or response[0].firstChild.nodeValue != "1" :
@@ -156,10 +159,10 @@ class VKSource(RB.BrowserSource):
 				captcha_sid = str(error[0].getElementsByTagName("captcha_sid")[0].firstChild.nodeValue)
 				captcha_img = str(error[0].getElementsByTagName("captcha_img")[0].firstChild.nodeValue)
 				cp_image=Gtk.Image()
-				cp_response=urllib.request.urlopen(captcha_img)
+				cp_response=urllib.urlopen(captcha_img)
 				loader=GdkPixbuf.PixbufLoader.new_with_type('jpeg')
 				loader.write(cp_response.read())
-				loader.close()        
+				loader.close()
 				cp_image.set_from_pixbuf(loader.get_pixbuf())
 				d = Gtk.Dialog(buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK))
 				cp_input = Gtk.Entry(width_chars=7,activates_default=True)
@@ -231,7 +234,7 @@ class VkontakteSearch:
 		self.entries_hashes = []
 		self.TOKEN = TOKEN
 		self.CAPTCHA_PARAM = ""
-		
+
 	def add_entry(self, result):
 		# add only distinct songs (unique by title+artist+duration) to prevent duplicates
 		strhash = ('%s%s%s' % (result.title, result.artist, result.duration)).lower()
@@ -249,15 +252,18 @@ class VkontakteSearch:
 			self.db.commit()
 			if entry is not None :
 				#update metadata
-				self.db.entry_set(entry, RB.RhythmDBPropType.TITLE, result.title)#decode_htmlentities(result.title))
-				self.db.entry_set(entry, RB.RhythmDBPropType.DURATION, result.duration)
-				self.db.entry_set(entry, RB.RhythmDBPropType.ARTIST, result.artist)#decode_htmlentities(result.artist))
+				#print "##################33 test", type(RB.RhythmDBPropType.TITLE), RB.RhythmDBPropType.TITLE, result.title
+				# title = GObject()
+				# title.value = result.title
+				self.db.entry_set(entry, RB.RhythmDBPropType.TITLE, GObject.Value(GObject.TYPE_STRING, result.title))#decode_htmlentities(result.title))
+				self.db.entry_set(entry, RB.RhythmDBPropType.DURATION, GObject.Value(GObject.TYPE_INT, result.duration))#)
+				self.db.entry_set(entry, RB.RhythmDBPropType.ARTIST, GObject.Value(GObject.TYPE_STRING, result.artist))#)#decode_htmlentities(result.artist))
 				#all the songs will get "vk.com" album
-				self.db.entry_set(entry, RB.RhythmDBPropType.ALBUM, "vk.com")
+				self.db.entry_set(entry, RB.RhythmDBPropType.ALBUM, GObject.Value(GObject.TYPE_STRING, "vk: %s" % self.search_line))
 			self.db.commit()
 		except Exception as e: # This happens on duplicate uris being added
 			sys.excepthook(*sys.exc_info())
-			print("Couldn't add %s - %s" % (result.artist, result.title), e)		
+			print("Couldn't add %s - %s" % (result.artist, result.title), e)
 
 	def on_search_results_recieved(self, data):
 		# vkontakte sometimes returns invalid XML with empty first line
@@ -271,10 +277,10 @@ class VkontakteSearch:
 				captcha_sid = str(error[0].getElementsByTagName("captcha_sid")[0].firstChild.nodeValue)
 				captcha_img = str(error[0].getElementsByTagName("captcha_img")[0].firstChild.nodeValue)
 				cp_image=Gtk.Image()
-				cp_response=urllib.request.urlopen(captcha_img)
+				cp_response=urllib.urlopen(captcha_img)
 				loader=GdkPixbuf.PixbufLoader.new_with_type('jpeg')
 				loader.write(cp_response.read())
-				loader.close()        
+				loader.close()
 				cp_image.set_from_pixbuf(loader.get_pixbuf())
 				d = Gtk.Dialog(buttons=(Gtk.STOCK_OK, Gtk.ResponseType.OK))
 				cp_input = Gtk.Entry(width_chars=7,activates_default=True)
@@ -305,9 +311,9 @@ class VkontakteSearch:
 
 	# Starts searching
 	def start(self):
-		path = "https://api.vk.com/method/audio.search.xml?auto_complete=1&count=%s&&q=%s&access_token=%s%s" % (self.search_num,urllib.parse.quote(self.search_line),self.TOKEN,self.CAPTCHA_PARAM)
-		loader = rb.Loader()
-		loader.get_url(path, self.on_search_results_recieved)
+		path = "https://api.vk.com/method/audio.search.xml?auto_complete=1&count=%s&&q=%s&access_token=%s%s" % (self.search_num,urllib.quote(self.search_line),self.TOKEN,self.CAPTCHA_PARAM)
+		dataloader = rb.Loader()
+		dataloader.get_url(path, self.on_search_results_recieved)
 
 #The class which deals with config window
 class VKRhythmboxConfig(GObject.Object, PeasGtk.Configurable):
@@ -334,7 +340,10 @@ class VKRhythmboxConfig(GObject.Object, PeasGtk.Configurable):
 			url = webview.get_property(prop.name)
 			if url.find("access_token") != -1 :
 				tl = grid.get_toplevel()
-				params = {key:value for key,value in [a.split("=") for a in url.split("#")[1].split("&")]}
+				#params = {key: value for key, value in [a.split("=") for a in url.split("#")[1].split("&")]}
+				params = {}
+				for key, value in [a.split("=") for a in url.split("#")[1].split("&")]:
+					params[key] = value
 				self.settings.set_string('token', params["access_token"])
 				#we should destroy options dialog here
 				#webview.destroy()
